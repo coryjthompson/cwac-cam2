@@ -65,6 +65,14 @@ abstract public class AbstractCameraActivity extends Activity {
     "cwac_cam2_allow_switch_flash_mode";
 
   /**
+   * Extra name for whether the camera should allow zoom and
+   * how. Value should be a ZoomStyle (NONE, PINCH, SEEKBAR).
+   * Default is NONE.
+   */
+  public static final String EXTRA_ZOOM_STYLE=
+          "cwac_cam2_zoom_style";
+
+  /**
    * A ResultReceiver to be invoked on any error that the library
    * cannot handle internally.
    */
@@ -675,6 +683,18 @@ abstract public class AbstractCameraActivity extends Activity {
       result.putExtra(EXTRA_ALLOW_SWITCH_FLASH_MODE, true);
 
       return((T)this);
+    }
+
+    /**
+     * Call to configure the ZoomStyle to be used. Default
+     * is NONE.
+     *
+     * @return the builder, for further configuration
+     */
+    public IntentBuilder zoomStyle(ZoomStyle zoomStyle) {
+      result.putExtra(EXTRA_ZOOM_STYLE, zoomStyle);
+
+      return(this);
     }
 
     /**
