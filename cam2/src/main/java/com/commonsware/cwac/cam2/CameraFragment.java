@@ -21,6 +21,7 @@ import android.animation.ObjectAnimator;
 import android.app.ActionBar;
 import android.app.Fragment;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
@@ -71,6 +72,8 @@ public class CameraFragment extends Fragment {
   private SeekBar zoomSlider;
   private Chronometer chronometer;
   private ReverseChronometer reverseChronometer;
+
+  private int defaultOrientation;
 
   public static CameraFragment newPictureInstance(Uri output,
                                                   boolean updateMediaStore,
@@ -133,6 +136,8 @@ public class CameraFragment extends Fragment {
     scaleDetector=
       new ScaleGestureDetector(getActivity().getApplicationContext(),
         scaleListener);
+
+    defaultOrientation = getActivity().getRequestedOrientation();
   }
 
   /**
@@ -379,32 +384,34 @@ public class CameraFragment extends Fragment {
   public void onEventMainThread(CameraEngine.VideoTakenEvent event) {
     isVideoRecording=false;
 
-    if (event.exception==null) {
-      if (getArguments().getBoolean(ARG_UPDATE_MEDIA_STORE, false)) {
-        final Context app=getActivity().getApplicationContext();
-        Uri output=getArguments().getParcelable(ARG_OUTPUT);
-        final String path=output.getPath();
+    try {
+      if (event.exception == null) {
+        if (getArguments().getBoolean(ARG_UPDATE_MEDIA_STORE, false)) {
+          final Context app = getActivity().getApplicationContext();
+          Uri output = getArguments().getParcelable(ARG_OUTPUT);
+          final String path = output.getPath();
 
-        new Thread() {
-          @Override
-          public void run() {
-            SystemClock.sleep(2000);
-            MediaScannerConnection.scanFile(app,
-              new String[]{path}, new String[]{"video/mp4"},
-              null);
-          }
-        }.start();
+          new Thread() {
+            @Override
+            public void run() {
+              SystemClock.sleep(2000);
+              MediaScannerConnection.scanFile(app,
+                      new String[]{path}, new String[]{"video/mp4"},
+                      null);
+            }
+          }.start();
+        }
+
+        isVideoRecording = false;
+        setVideoFABToNormal();
+      } else if (getActivity().isFinishing()) {
+        shutdown();
+      } else {
+        ctlr.postError(ErrorConstants.ERROR_VIDEO_TAKEN, event.exception);
+        getActivity().finish();
       }
-
-      isVideoRecording=false;
-      setVideoFABToNormal();
-    }
-    else if (getActivity().isFinishing()) {
-      shutdown();
-    }
-    else {
-      ctlr.postError(ErrorConstants.ERROR_VIDEO_TAKEN, event.exception);
-      getActivity().finish();
+    } finally {
+      unlockOrientation();
     }
   }
 
@@ -444,6 +451,8 @@ public class CameraFragment extends Fragment {
     }
     else {
       try {
+        lockOrientation();
+
         VideoTransaction.Builder b=
           new VideoTransaction.Builder();
         Uri output=getArguments().getParcelable(ARG_OUTPUT);
@@ -489,6 +498,7 @@ public class CameraFragment extends Fragment {
     }
     finally {
       isVideoRecording=false;
+      unlockOrientation();
     }
   }
 
@@ -629,6 +639,20 @@ public class CameraFragment extends Fragment {
         }
       }
     };
+
+  private void lockOrientation() {
+    if (getActivity().getResources().getConfiguration().orientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
+      getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+    }
+
+    if (getActivity().getResources().getConfiguration().orientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
+      getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+    }
+  }
+
+  private void unlockOrientation() {
+    getActivity().setRequestedOrientation(defaultOrientation);
+  }
 
   private SeekBar.OnSeekBarChangeListener seekListener=
     new SeekBar.OnSeekBarChangeListener() {
